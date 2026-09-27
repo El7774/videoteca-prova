@@ -1,0 +1,8 @@
+# Artefatti di build (l'APK pronto è committato in root come Videoteca-v1.0.0.apk)
+build/
+
+# Keystore di firma personale: NON committare chiavi private.
+# build-apk.sh rigenera un keystore nuovo se assente.
+debug.keystore
+*.keystore
+*.jks
