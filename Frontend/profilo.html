@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profilo — Videoteca</title>
+<script>
+  // Guardia di accesso: senza un token salvato si torna al login
+  if (!localStorage.getItem('videoteca-token') && !sessionStorage.getItem('videoteca-token')) {
+    window.location.replace('index.html');
+  }
+  // Applica il tema scelto dall'utente
+  (function(){
+    var theme = localStorage.getItem('videoteca-theme');
+    if(theme) document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<link rel="stylesheet" href="styles.css?v=6">
+
+</head>
+<body>
+<div class="wrap">
+  <div class="session-bar">
+    <a href="homepage.html" class="back-arrow" title="Torna alla videoteca" aria-label="Torna alla videoteca">←</a>
+    <button class="btn ghost" id="btnLogout">Esci</button>
+  </div>
+
+  <header>
+    <div>
+      <p class="eyebrow">Impostazioni account</p>
+      <h1>Profilo</h1>
+    </div>
+  </header>
+
+  <div class="profile-grid">
+
+    <div class="profile-section">
+      <h2>Account</h2>
+      <div class="profile-account-row">
+        <label class="avatar-upload avatar-upload-lg" id="avatarUpload" title="Cambia foto profilo">
+          <img class="avatar-img" id="avatarImg" alt="">
+          <span class="avatar-initial" id="avatarInitial"></span>
+          <input type="file" accept="image/*" id="avatarInput" hidden>
+        </label>
+        <div>
+          <p class="profile-username">Username attuale: <strong id="profileUsername"></strong></p>
+          <p class="hint" style="margin-top:6px;">Clicca sulla foto per cambiarla.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-section">
+      <h2>Username</h2>
+      <p class="hint">Cambia il nome con cui accedi alla videoteca.</p>
+      <button class="btn primary" id="btnChangeUsername">Cambia username</button>
+    </div>
+
+    <div class="profile-section">
+      <h2>Password</h2>
+      <p class="hint">Aggiorna la password del tuo account.</p>
+      <button class="btn primary" id="btnChangePassword">Cambia password</button>
+    </div>
+
+    <div class="profile-section">
+      <h2>Aspetto</h2>
+      <p class="hint">Scegli la combinazione di colori dell'app. Vale per login, videoteca e profilo.</p>
+      <button class="btn primary" id="btnChangeTheme">Cambia tema</button>
+    </div>
+
+    <div class="profile-section">
+      <h2>Dati</h2>
+      <p class="hint">Esporta un backup della tua videoteca o importane uno precedente.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn ghost" id="btnExport">Esporta dati</button>
+        <button class="btn ghost" id="btnImport">Importa dati</button>
+        <input type="file" id="fileImport" accept="application/json" style="display:none">
+      </div>
+    </div>
+
+    <div class="profile-section danger-zone">
+      <h2>Zona pericolosa</h2>
+      <p class="hint">Eliminando l'account perderai l'accesso con queste credenziali e l'intera videoteca collegata all'account, inclusi i titoli salvati. Se vuoi conservarli, esporta un backup dalla sezione "Dati" prima di procedere.</p>
+      <button class="btn danger" id="btnDeleteAccount">Elimina account</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="overlay" id="usernameOverlay" style="display:none;">
+  <div class="modal">
+    <h2>Cambia username</h2>
+    <div class="form-error" id="usernameError"></div>
+    <div class="form-success" id="usernameSuccess"></div>
+    <form id="usernameForm">
+      <div class="field">
+        <label>Nuovo username</label>
+        <input type="text" id="newUsername" placeholder="Nuovo username" required>
+      </div>
+      <div class="field">
+        <label>Password attuale</label>
+        <input type="password" id="usernameConfirmPassword" placeholder="Password attuale" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="usernameCancel">Annulla</button>
+        <button type="submit" class="btn primary">Aggiorna username</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="passwordOverlay" style="display:none;">
+  <div class="modal">
+    <h2>Cambia password</h2>
+    <div class="form-error" id="passwordError"></div>
+    <div class="form-success" id="passwordSuccess"></div>
+    <form id="passwordForm">
+      <div class="field">
+        <label>Password attuale</label>
+        <input type="password" id="currentPassword" placeholder="Password attuale" required>
+      </div>
+      <div class="field">
+        <label>Nuova password</label>
+        <input type="password" id="newPassword" placeholder="Nuova password" required>
+      </div>
+      <div class="field">
+        <label>Conferma nuova password</label>
+        <input type="password" id="newPasswordConfirm" placeholder="Conferma nuova password" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="passwordCancel">Annulla</button>
+        <button type="submit" class="btn primary">Aggiorna password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="themeOverlay" style="display:none;">
+  <div class="modal theme-modal">
+    <h2>Scegli un tema</h2>
+    <div class="theme-grid" id="themeGrid"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="themeClose">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="importConfirmOverlay" style="display:none;">
+  <div class="modal">
+    <h2>Conferma importazione</h2>
+    <p>Importare questi dati sostituirà la collezione attuale. Continuare?</p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="importConfirmNo">Annulla</button>
+      <button class="btn primary" id="importConfirmYes">Conferma</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="deleteOverlay" style="display:none;">
+  <div class="modal">
+    <h2>Elimina account</h2>
+    <p>Questa azione è irreversibile. Inserisci la password di <strong id="deleteUsernameLabel"></strong> per confermare.</p>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="deleteConfirmPassword" placeholder="Password">
+    </div>
+    <div class="form-error" id="deleteError"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="deleteCancel">Annulla</button>
+      <button class="btn danger" id="deleteConfirm">Elimina definitivamente</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const TOKEN_KEY = 'videoteca-token';
+  const USERNAME_KEY = 'videoteca-username';
+
+  // ATTENZIONE: sostituisci questo indirizzo con l'URL del tuo server
+  // dopo averlo pubblicato su Render (vedi la guida ricevuta in chat).
+  const API_BASE = 'https://videoteca-backend.onrender.com/api';
+
+  function getToken(){
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  }
+  function redirectToLogin(){
+    localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USERNAME_KEY); sessionStorage.removeItem(USERNAME_KEY);
+    window.location.replace('index.html');
+  }
+  async function apiFetch(path, options = {}){
+    const token = getToken();
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if(token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+    let data = null;
+    try{ data = await res.json(); }catch(e){ /* risposta vuota */ }
+    if(!res.ok){
+      const err = new Error((data && data.error) || ('Errore del server (' + res.status + ').'));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  function showMsg(el, message) {
+    el.textContent = message;
+    el.classList.add('show');
+  }
+  function hideMsg(el) {
+    el.classList.remove('show');
+  }
+  function showNotice(message){
+    const t = document.createElement('div');
+    t.className = 'notice-toast';
+    t.textContent = message;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  // ---------- Esporta / Importa dati ----------
+  document.getElementById('btnExport').onclick = async () => {
+    let data = [];
+    try{ data = await apiFetch('/shows'); }catch(e){ showNotice('Impossibile contattare il server.'); return; }
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'videoteca-backup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  document.getElementById('btnImport').onclick = () => document.getElementById('fileImport').click();
+
+  const importConfirmOverlay = document.getElementById('importConfirmOverlay');
+  document.getElementById('fileImport').onchange = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try{
+        data = JSON.parse(reader.result);
+        if(!Array.isArray(data)) throw new Error('formato non valido');
+      }catch(err){
+        showNotice('Il file selezionato non è un backup valido.');
+        return;
+      }
+      importConfirmOverlay.style.display = 'flex';
+      const yesBtn = document.getElementById('importConfirmYes');
+      const noBtn = document.getElementById('importConfirmNo');
+      const cleanup = () => { importConfirmOverlay.style.display = 'none'; yesBtn.onclick = null; noBtn.onclick = null; };
+      yesBtn.onclick = async () => {
+        try{
+          await apiFetch('/shows', { method:'PUT', body: JSON.stringify(data) });
+          cleanup();
+          showNotice('Dati importati correttamente.');
+        }catch(err){
+          cleanup();
+          showNotice('Impossibile salvare i dati importati: ' + err.message);
+        }
+      };
+      noBtn.onclick = cleanup;
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Username mostrato subito dalla cache locale; verrà confermato dal server sotto
+  let currentUsername = localStorage.getItem(USERNAME_KEY) || sessionStorage.getItem(USERNAME_KEY);
+  const usesLocal = !!localStorage.getItem(TOKEN_KEY);
+
+  document.getElementById('profileUsername').textContent = currentUsername || '';
+  document.getElementById('deleteUsernameLabel').textContent = currentUsername || '';
+
+  // ---------- Avatar ----------
+  const avatarImg = document.getElementById('avatarImg');
+  const avatarInitial = document.getElementById('avatarInitial');
+  const avatarInput = document.getElementById('avatarInput');
+
+  function displayAvatar(dataUrl){
+    if(dataUrl){
+      avatarImg.src = dataUrl;
+      avatarImg.style.display = 'block';
+      avatarInitial.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+      avatarInitial.style.display = 'flex';
+      avatarInitial.textContent = (currentUsername || '?').trim().charAt(0).toUpperCase();
+    }
+  }
+
+  async function loadAccountInfo(){
+    try{
+      const me = await apiFetch('/me');
+      if(me && me.username){
+        currentUsername = me.username;
+        document.getElementById('profileUsername').textContent = me.username;
+        document.getElementById('deleteUsernameLabel').textContent = me.username;
+        if(usesLocal) localStorage.setItem(USERNAME_KEY, me.username);
+        else sessionStorage.setItem(USERNAME_KEY, me.username);
+      }
+      displayAvatar(me ? me.avatar : null);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      displayAvatar(null);
+    }
+  }
+  loadAccountInfo();
+
+  if(avatarInput) avatarInput.onchange = () => {
+    const file = avatarInput.files && avatarInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 160;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        apiFetch('/me/avatar', { method:'PUT', body: JSON.stringify({ avatar: dataUrl }) })
+          .then(() => displayAvatar(dataUrl))
+          .catch(err => showNotice('Non sono riuscito a salvare la foto: ' + err.message));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    avatarInput.value = '';
+  };
+
+  // ---------- Logout ----------
+  document.getElementById('btnLogout').onclick = () => { redirectToLogin(); };
+
+  // ---------- Cambia username ----------
+  const usernameOverlay = document.getElementById('usernameOverlay');
+  const usernameError = document.getElementById('usernameError');
+  const usernameSuccess = document.getElementById('usernameSuccess');
+
+  document.getElementById('btnChangeUsername').onclick = () => {
+    document.getElementById('newUsername').value = '';
+    document.getElementById('usernameConfirmPassword').value = '';
+    hideMsg(usernameError); hideMsg(usernameSuccess);
+    usernameOverlay.style.display = 'flex';
+    document.getElementById('newUsername').focus();
+  };
+  document.getElementById('usernameCancel').onclick = () => { usernameOverlay.style.display = 'none'; };
+  usernameOverlay.onclick = (e) => { if (e.target === usernameOverlay) usernameOverlay.style.display = 'none'; };
+
+  document.getElementById('usernameForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideMsg(usernameError); hideMsg(usernameSuccess);
+
+    const newUsername = document.getElementById('newUsername').value.trim();
+    const password = document.getElementById('usernameConfirmPassword').value;
+
+    if (!newUsername || !password) {
+      showMsg(usernameError, 'Compila entrambi i campi.');
+      return;
+    }
+
+    try{
+      const data = await apiFetch('/me/username', {
+        method: 'PATCH',
+        body: JSON.stringify({ newUsername, password })
+      });
+      currentUsername = data.username;
+      if (usesLocal) localStorage.setItem(USERNAME_KEY, data.username);
+      else sessionStorage.setItem(USERNAME_KEY, data.username);
+      document.getElementById('profileUsername').textContent = data.username;
+      document.getElementById('deleteUsernameLabel').textContent = data.username;
+
+      document.getElementById('newUsername').value = '';
+      document.getElementById('usernameConfirmPassword').value = '';
+      showMsg(usernameSuccess, 'Username aggiornato.');
+    }catch(err){
+      if(err.status === 401 && /token|sessione/i.test(err.message)){ redirectToLogin(); return; }
+      showMsg(usernameError, err.message);
+    }
+  });
+
+  // ---------- Cambia password ----------
+  const passwordOverlay = document.getElementById('passwordOverlay');
+  const passwordError = document.getElementById('passwordError');
+  const passwordSuccess = document.getElementById('passwordSuccess');
+
+  document.getElementById('btnChangePassword').onclick = () => {
+    document.getElementById('currentPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('newPasswordConfirm').value = '';
+    hideMsg(passwordError); hideMsg(passwordSuccess);
+    passwordOverlay.style.display = 'flex';
+    document.getElementById('currentPassword').focus();
+  };
+  document.getElementById('passwordCancel').onclick = () => { passwordOverlay.style.display = 'none'; };
+  passwordOverlay.onclick = (e) => { if (e.target === passwordOverlay) passwordOverlay.style.display = 'none'; };
+
+  document.getElementById('passwordForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideMsg(passwordError); hideMsg(passwordSuccess);
+
+    const current = document.getElementById('currentPassword').value;
+    const next = document.getElementById('newPassword').value;
+    const confirm = document.getElementById('newPasswordConfirm').value;
+
+    if (!current || !next || !confirm) {
+      showMsg(passwordError, 'Compila tutti i campi.');
+      return;
+    }
+    if (next !== confirm) {
+      showMsg(passwordError, 'Le nuove password non coincidono.');
+      return;
+    }
+
+    try{
+      await apiFetch('/me/password', {
+        method: 'PATCH',
+        body: JSON.stringify({ currentPassword: current, newPassword: next })
+      });
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('newPasswordConfirm').value = '';
+      showMsg(passwordSuccess, 'Password aggiornata.');
+    }catch(err){
+      if(err.status === 401 && /sessione/i.test(err.message)){ redirectToLogin(); return; }
+      showMsg(passwordError, err.message);
+    }
+  });
+
+  // ---------- Cambia tema ----------
+  const THEME_KEY = 'videoteca-theme';
+  const THEMES = [
+    { key: 'default', name: 'Predefinito', colors: ['#D9541F', '#1F7A8C'] },
+    { key: 'neo-noir', name: 'Neo-noir', colors: ['#E8A33D', '#3E6E8E'] },
+    { key: 'cyberpunk', name: 'Cyberpunk', colors: ['#FF2E88', '#00E5FF'] },
+    { key: 'nordic', name: 'Nordic thriller', colors: ['#4FA9D8', '#A62639'] },
+    { key: 'retro-vhs', name: 'Retro VHS', colors: ['#7B2FF7', '#0FD68B'] },
+    { key: 'western', name: 'Western', colors: ['#C1440E', '#D8C39A'] }
+  ];
+
+  function currentTheme(){
+    return localStorage.getItem(THEME_KEY) || 'default';
+  }
+
+  function applyTheme(key){
+    if(key === 'default'){
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.removeItem(THEME_KEY);
+    } else {
+      document.documentElement.setAttribute('data-theme', key);
+      localStorage.setItem(THEME_KEY, key);
+    }
+  }
+
+  function renderThemeGrid(){
+    const grid = document.getElementById('themeGrid');
+    const active = currentTheme();
+    grid.innerHTML = '';
+    THEMES.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'theme-option' + (t.key === active ? ' active' : '');
+      btn.innerHTML = `
+        <span class="theme-swatch">
+          <span style="background:${t.colors[0]}"></span>
+          <span style="background:${t.colors[1]}"></span>
+        </span>
+        <span class="theme-name">${t.name}</span>
+      `;
+      btn.onclick = () => {
+        applyTheme(t.key);
+        renderThemeGrid();
+      };
+      grid.appendChild(btn);
+    });
+  }
+
+  const themeOverlay = document.getElementById('themeOverlay');
+  document.getElementById('btnChangeTheme').onclick = () => {
+    renderThemeGrid();
+    themeOverlay.style.display = 'flex';
+  };
+  document.getElementById('themeClose').onclick = () => { themeOverlay.style.display = 'none'; };
+  themeOverlay.onclick = (e) => { if (e.target === themeOverlay) themeOverlay.style.display = 'none'; };
+
+  // ---------- Elimina account ----------
+  const deleteOverlay = document.getElementById('deleteOverlay');
+  const deleteError = document.getElementById('deleteError');
+
+  document.getElementById('btnDeleteAccount').onclick = () => {
+    document.getElementById('deleteConfirmPassword').value = '';
+    hideMsg(deleteError);
+    deleteOverlay.style.display = 'flex';
+    document.getElementById('deleteConfirmPassword').focus();
+  };
+  document.getElementById('deleteCancel').onclick = () => { deleteOverlay.style.display = 'none'; };
+  deleteOverlay.onclick = (e) => { if (e.target === deleteOverlay) deleteOverlay.style.display = 'none'; };
+
+  document.getElementById('deleteConfirm').onclick = async () => {
+    const password = document.getElementById('deleteConfirmPassword').value;
+    hideMsg(deleteError);
+
+    try{
+      await apiFetch('/me', { method: 'DELETE', body: JSON.stringify({ password }) });
+      redirectToLogin();
+    }catch(err){
+      showMsg(deleteError, err.message);
+    }
+  };
+})();
+</script>
+</body>
+</html>

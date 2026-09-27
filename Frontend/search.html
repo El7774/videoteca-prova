@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cerca online — Videoteca</title>
+<script>
+  // Guardia di accesso: senza un token salvato si torna al login
+  if (!localStorage.getItem('videoteca-token') && !sessionStorage.getItem('videoteca-token')) {
+    window.location.replace('index.html');
+  }
+  // Applica il tema scelto dall'utente (letto localmente per evitare lo sfarfallio iniziale)
+  (function(){
+    var theme = localStorage.getItem('videoteca-theme');
+    if(theme) document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<link rel="stylesheet" href="styles.css?v=6">
+<style>
+  .search-page-header{ display:flex; align-items:center; gap: 14px; margin-bottom: 24px; }
+  .search-page-header h1{ font-family:'Bebas Neue',sans-serif; font-size: 32px; letter-spacing: 0.5px; margin:0; }
+  .search-results-grid{ display:flex; flex-direction:column; gap: 4px; }
+  .search-results-grid .online-search-result{ padding: 14px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+  .search-results-grid .online-search-result + .online-search-result{ border-top: 1px solid var(--line); margin-top: 8px; padding-top: 14px; }
+  .search-results-grid .online-search-poster{ width: 56px; height: 80px; font-size: 22px; }
+  .search-results-grid .online-search-title{ white-space: normal; font-size: 15px; }
+  .search-empty{ text-align:center; padding: 60px 20px; color: var(--muted); font-family:'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="session-bar">
+    <div class="session-identity">
+      <label class="avatar-upload" id="avatarUpload" title="Cambia foto profilo">
+        <img class="avatar-img" id="avatarImg" alt="">
+        <span class="avatar-initial" id="avatarInitial"></span>
+        <input type="file" accept="image/*" id="avatarInput" hidden>
+      </label>
+      <a href="profilo.html" class="profile-link"><strong id="sessionUserName"></strong></a>
+    </div>
+    <button class="btn ghost" id="btnLogout">Esci</button>
+  </div>
+
+  <div class="search-page-header">
+    <a href="homepage.html" class="back-arrow" title="Torna alla videoteca" aria-label="Torna alla videoteca">←</a>
+    <h1>Cerca online</h1>
+  </div>
+
+  <form class="online-search-bar" id="onlineSearchForm" style="margin-bottom: 30px;">
+    <div class="online-search-field">
+      <span class="online-search-icon">🔍</span>
+      <input type="search" id="onlineSearchInput" placeholder="Cerca online..." enterkeyhint="search" autocomplete="off">
+    </div>
+    <button type="submit" class="btn primary">Cerca online</button>
+  </form>
+
+  <div class="search-results-grid" id="searchResultsGrid"></div>
+</div>
+
+<script>
+(function () {
+  const TOKEN_KEY = 'videoteca-token';
+  const USERNAME_KEY = 'videoteca-username';
+
+  // ATTENZIONE: sostituisci questo indirizzo con l'URL del tuo server
+  // dopo averlo pubblicato su Render (stesso indirizzo usato negli altri file).
+  const API_BASE = 'https://videoteca-backend.onrender.com/api';
+
+  function getToken(){
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  }
+  function getStoredUsername(){
+    return localStorage.getItem(USERNAME_KEY) || sessionStorage.getItem(USERNAME_KEY);
+  }
+  function redirectToLogin(){
+    localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USERNAME_KEY); sessionStorage.removeItem(USERNAME_KEY);
+    window.location.replace('index.html');
+  }
+
+  async function apiFetch(path, options = {}){
+    const token = getToken();
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if(token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+    let data = null;
+    try{ data = await res.json(); }catch(e){ /* risposta vuota */ }
+    if(!res.ok){
+      const err = new Error((data && data.error) || ('Errore del server (' + res.status + ').'));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  function uid(){
+    return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function showNotice(message){
+    const t = document.createElement('div');
+    t.className = 'notice-toast';
+    t.textContent = message;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  // ---------- Sessione / Logout / Avatar (stessa logica delle altre pagine) ----------
+  const authUser = getStoredUsername();
+  const sessionUserName = document.getElementById('sessionUserName');
+  if (sessionUserName) sessionUserName.textContent = authUser || '';
+  document.getElementById('btnLogout').onclick = () => redirectToLogin();
+
+  const avatarImg = document.getElementById('avatarImg');
+  const avatarInitial = document.getElementById('avatarInitial');
+  const avatarInput = document.getElementById('avatarInput');
+
+  function displayAvatar(dataUrl, usernameForInitial){
+    if(dataUrl){
+      avatarImg.src = dataUrl;
+      avatarImg.style.display = 'block';
+      avatarInitial.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+      avatarInitial.style.display = 'flex';
+      avatarInitial.textContent = (usernameForInitial || '?').trim().charAt(0).toUpperCase();
+    }
+  }
+
+  async function loadAccountInfo(){
+    try{
+      const me = await apiFetch('/me');
+      if(me && me.username && sessionUserName) sessionUserName.textContent = me.username;
+      displayAvatar(me ? me.avatar : null, me ? me.username : authUser);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      displayAvatar(null, authUser);
+    }
+  }
+  loadAccountInfo();
+
+  if(avatarInput) avatarInput.onchange = () => {
+    const file = avatarInput.files && avatarInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 160;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        apiFetch('/me/avatar', { method:'PUT', body: JSON.stringify({ avatar: dataUrl }) })
+          .then(() => displayAvatar(dataUrl, authUser))
+          .catch(err => showNotice('Non sono riuscito a salvare la foto: ' + err.message));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    avatarInput.value = '';
+  };
+
+  // ---------- Collezione (serve solo per poter aggiungere titoli) ----------
+  let shows = [];
+  async function loadShows(){
+    try{
+      const data = await apiFetch('/shows');
+      shows = Array.isArray(data) ? data : [];
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      shows = [];
+    }
+  }
+  function saveShows(){
+    apiFetch('/shows', { method:'PUT', body: JSON.stringify(shows) })
+      .catch(e => {
+        if(e.status === 401){ redirectToLogin(); return; }
+        showNotice('Non sono riuscito a salvare i dati sul server.');
+      });
+  }
+
+  // ---------- Ricerca (TMDB) ----------
+  const form = document.getElementById('onlineSearchForm');
+  const input = document.getElementById('onlineSearchInput');
+  const grid = document.getElementById('searchResultsGrid');
+
+  function mediaTypeLabel(mediaType){
+    return mediaType === 'movie' ? 'Film' : 'Serie TV';
+  }
+
+  // Un risultato è già nello scaffale se c'è uno show con lo stesso tmdbId e lo stesso tipo.
+  function isInShelf(item){
+    const wantedType = item.mediaType === 'movie' ? 'film' : 'serie';
+    return shows.some(s => s.tmdbId === item.tmdbId && s.type === wantedType);
+  }
+
+  async function fetchCombinedResults(query){
+    let tmdbList;
+    try{
+      tmdbList = await apiFetch('/catalog/search?query=' + encodeURIComponent(query));
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); }
+      throw e;
+    }
+    return tmdbList || [];
+  }
+
+  function buildResultRow(r){
+    const item = document.createElement('div');
+    item.className = 'online-search-result';
+    item.style.cursor = 'pointer';
+    const added = isInShelf(r);
+    item.innerHTML = `
+      <div class="online-search-poster">${r.posterUrl ? `<img src="${r.posterUrl}" alt="">` : '🎬'}</div>
+      <div class="online-search-info">
+        <div class="online-search-title">${escapeHtml(r.title)}${r.year ? ' <span class="online-search-year">(' + escapeHtml(r.year) + ')</span>' : ''}</div>
+        <span class="type-badge ${r.mediaType === 'movie' ? 'film' : 'serie'}">${mediaTypeLabel(r.mediaType)}</span>
+      </div>
+      <button type="button" class="btn ${added ? 'ghost' : 'primary'} online-search-add">${added ? '✓ Nella videoteca' : '+ Aggiungi'}</button>
+    `;
+    item.onclick = () => { window.location.href = 'details.html?type=' + r.mediaType + '&id=' + r.tmdbId; };
+    item.querySelector('.online-search-add').onclick = (e) => { e.stopPropagation(); addResult(r, item); };
+    return item;
+  }
+
+  async function addResult(result, itemEl){
+    const addBtn = itemEl.querySelector('.online-search-add');
+    if(addBtn.dataset.busy === '1') return;
+
+    // Se il titolo è già nello scaffale, un secondo clic sullo stesso tasto lo rimuove
+    // invece di aggiungerlo di nuovo in duplicato.
+    if(isInShelf(result)){
+      const wantedType = result.mediaType === 'movie' ? 'film' : 'serie';
+      const existing = shows.find(s => s.tmdbId === result.tmdbId && s.type === wantedType);
+      if(existing){
+        shows = shows.filter(s => s.id !== existing.id);
+        saveShows();
+        addBtn.className = 'btn primary online-search-add';
+        addBtn.textContent = '+ Aggiungi';
+        showNotice(`"${existing.title}" rimosso dallo scaffale.`);
+      }
+      return;
+    }
+
+    addBtn.dataset.busy = '1';
+    addBtn.disabled = true;
+    addBtn.textContent = 'Attendere…';
+
+    const detailsPath = '/catalog/details?id=' + result.tmdbId + '&type=' + result.mediaType;
+
+    let details;
+    try{
+      details = await apiFetch(detailsPath);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      showNotice('Impossibile recuperare i dettagli: ' + e.message);
+      addBtn.dataset.busy = '';
+      addBtn.disabled = false;
+      addBtn.textContent = '+ Aggiungi';
+      return;
+    }
+
+    shows.unshift({
+      id: uid(),
+      title: details.title,
+      type: details.type,
+      rating: 0,
+      favorite: false,
+      episodeRuntime: details.episodeRuntime || null,
+      posterUrl: details.posterUrl || result.posterUrl || null,
+      backdropUrl: details.backdropUrl || null,
+      tmdbId: result.tmdbId || null,
+      lastModifiedAt: Date.now(),
+      seasons: details.seasons
+    });
+    saveShows();
+
+    showNotice('"' + details.title + '" aggiunto alla videoteca.');
+    addBtn.dataset.busy = '';
+    addBtn.disabled = false;
+    addBtn.className = 'btn ghost online-search-add';
+    addBtn.textContent = '✓ Nella videoteca';
+  }
+
+  async function runSearch(query){
+    grid.innerHTML = '<div class="search-empty">Ricerca in corso…</div>';
+    let results;
+    try{
+      results = await fetchCombinedResults(query);
+    }catch(e){
+      grid.innerHTML = '<div class="search-empty">' + escapeHtml(e.message || 'Errore durante la ricerca.') + '</div>';
+      return;
+    }
+    if(!results || results.length === 0){
+      grid.innerHTML = '<div class="search-empty">Nessun risultato per "' + escapeHtml(query) + '".</div>';
+      return;
+    }
+    grid.innerHTML = '';
+    results.forEach(r => grid.appendChild(buildResultRow(r)));
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const query = input.value.trim();
+    if(!query){ showNotice('Scrivi qualcosa da cercare.'); return; }
+    history.replaceState(null, '', 'search.html?q=' + encodeURIComponent(query));
+    runSearch(query);
+  });
+
+  // ---------- Init ----------
+  async function init(){
+    await loadShows();
+    const params = new URLSearchParams(window.location.search);
+    const initialQuery = params.get('q');
+    if(initialQuery){
+      input.value = initialQuery;
+      runSearch(initialQuery);
+    } else {
+      grid.innerHTML = '<div class="search-empty">Scrivi un titolo per iniziare a cercare.</div>';
+    }
+  }
+  init();
+})();
+</script>
+</body>
+</html>
