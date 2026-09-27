@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const meRoutes = require('./routes/me');
 const showsRoutes = require('./routes/shows');
 const catalogRoutes = require('./routes/catalog');
+const episodeSocialRoutes = require('./routes/episodeSocial');
 
 // Limitatori per le rotte sensibili (express-rate-limit).
 const { rateLimit } = require('express-rate-limit');
@@ -90,6 +91,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/shows', showsRoutes);
 app.use('/api/catalog', catalogRoutes);
+app.use('/api/episode-social', episodeSocialRoutes);
 
 app.get('/', (req, res) => {
   res.send('Videoteca API attiva.');

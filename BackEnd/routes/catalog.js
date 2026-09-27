@@ -128,8 +128,11 @@ router.get('/episodes', async (req, res) => {
     const episodes = (data.episodes || []).map(e => ({
       episodeNumber: e.episode_number,
       name: e.name || null,
+      overview: e.overview || '',
       stillUrl: e.still_path ? `https://image.tmdb.org/t/p/w300${e.still_path}` : null,
-      runtime: typeof e.runtime === 'number' ? e.runtime : null
+      runtime: typeof e.runtime === 'number' ? e.runtime : null,
+      airDate: e.air_date || null,
+      voteAverage: typeof e.vote_average === 'number' ? Math.round(e.vote_average * 10) / 10 : null
     }));
 
     episodesCache.set(cacheKey, { data: episodes, expiresAt: Date.now() + EPISODES_CACHE_TTL_MS });
