@@ -68,6 +68,9 @@ router.patch('/password', async (req, res) => {
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Compila tutti i campi.' });
   }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'La nuova password deve avere almeno 8 caratteri.' });
+  }
 
   try {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);

@@ -23,6 +23,9 @@ router.post('/register', async (req, res) => {
   if (!username || !email || !password) {
     return res.status(400).json({ error: 'Username, email e password sono obbligatori.' });
   }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'La password deve avere almeno 8 caratteri.' });
+  }
 
   try {
     const existing = await pool.query(
@@ -143,8 +146,8 @@ router.post('/reset-password', async (req, res) => {
   if (!token || !newPassword) {
     return res.status(400).json({ error: 'Dati mancanti.' });
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'La password deve avere almeno 6 caratteri.' });
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'La password deve avere almeno 8 caratteri.' });
   }
 
   try {
