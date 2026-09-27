@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Del momento — Videoteca</title>
+<script>
+  // Guardia di accesso: senza un token salvato si torna al login
+  if (!localStorage.getItem('videoteca-token') && !sessionStorage.getItem('videoteca-token')) {
+    window.location.replace('index.html');
+  }
+  // Applica il tema scelto dall'utente (letto localmente per evitare lo sfarfallio iniziale)
+  (function(){
+    var theme = localStorage.getItem('videoteca-theme');
+    if(theme) document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<link rel="stylesheet" href="styles.css?v=6">
+<style>
+  .trending-page-header{ display:flex; align-items:center; gap: 14px; margin-bottom: 24px; }
+  .trending-page-header h1{ font-family:'Bebas Neue',sans-serif; font-size: 32px; letter-spacing: 0.5px; margin:0; }
+  .trending-page-grid{ display:flex; flex-wrap: wrap; gap: 20px; }
+  .trending-page-empty{ width:100%; text-align:center; padding: 60px 20px; color: var(--muted); font-family:'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="session-bar">
+    <div class="session-identity">
+      <label class="avatar-upload" id="avatarUpload" title="Cambia foto profilo">
+        <img class="avatar-img" id="avatarImg" alt="">
+        <span class="avatar-initial" id="avatarInitial"></span>
+        <input type="file" accept="image/*" id="avatarInput" hidden>
+      </label>
+      <a href="profilo.html" class="profile-link"><strong id="sessionUserName"></strong></a>
+    </div>
+    <button class="btn ghost" id="btnLogout">Esci</button>
+  </div>
+
+  <div class="trending-page-header">
+    <a href="homepage.html" class="back-arrow" title="Torna alla videoteca" aria-label="Torna alla videoteca">←</a>
+    <h1 id="pageTitle">Del momento</h1>
+  </div>
+
+  <div class="trending-page-grid" id="trendingPageGrid"></div>
+
+  <div style="text-align:center; margin-top: 30px;">
+    <button type="button" class="btn ghost" id="expandBtn" style="display:none;">Mostra altri 100</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const TOKEN_KEY = 'videoteca-token';
+  const USERNAME_KEY = 'videoteca-username';
+
+  // ATTENZIONE: sostituisci questo indirizzo con l'URL del tuo server
+  // dopo averlo pubblicato su Render (stesso indirizzo usato negli altri file).
+  const API_BASE = 'https://videoteca-backend.onrender.com/api';
+
+  function getToken(){
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  }
+  function getStoredUsername(){
+    return localStorage.getItem(USERNAME_KEY) || sessionStorage.getItem(USERNAME_KEY);
+  }
+  function redirectToLogin(){
+    localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USERNAME_KEY); sessionStorage.removeItem(USERNAME_KEY);
+    window.location.replace('index.html');
+  }
+
+  async function apiFetch(path, options = {}){
+    const token = getToken();
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if(token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+    let data = null;
+    try{ data = await res.json(); }catch(e){ /* risposta vuota */ }
+    if(!res.ok){
+      const err = new Error((data && data.error) || ('Errore del server (' + res.status + ').'));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  function uid(){
+    return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  }
+  function showNotice(message){
+    const t = document.createElement('div');
+    t.className = 'notice-toast';
+    t.textContent = message;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  // ---------- Sessione / Logout / Avatar (stessa logica delle altre pagine) ----------
+  const authUser = getStoredUsername();
+  const sessionUserName = document.getElementById('sessionUserName');
+  if (sessionUserName) sessionUserName.textContent = authUser || '';
+  document.getElementById('btnLogout').onclick = () => redirectToLogin();
+
+  const avatarImg = document.getElementById('avatarImg');
+  const avatarInitial = document.getElementById('avatarInitial');
+  const avatarInput = document.getElementById('avatarInput');
+
+  function displayAvatar(dataUrl, usernameForInitial){
+    if(dataUrl){
+      avatarImg.src = dataUrl;
+      avatarImg.style.display = 'block';
+      avatarInitial.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+      avatarInitial.style.display = 'flex';
+      avatarInitial.textContent = (usernameForInitial || '?').trim().charAt(0).toUpperCase();
+    }
+  }
+
+  async function loadAccountInfo(){
+    try{
+      const me = await apiFetch('/me');
+      if(me && me.username && sessionUserName) sessionUserName.textContent = me.username;
+      displayAvatar(me ? me.avatar : null, me ? me.username : authUser);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      displayAvatar(null, authUser);
+    }
+  }
+  loadAccountInfo();
+
+  if(avatarInput) avatarInput.onchange = () => {
+    const file = avatarInput.files && avatarInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 160;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        apiFetch('/me/avatar', { method:'PUT', body: JSON.stringify({ avatar: dataUrl }) })
+          .then(() => displayAvatar(dataUrl, authUser))
+          .catch(err => showNotice('Non sono riuscito a salvare la foto: ' + err.message));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    avatarInput.value = '';
+  };
+
+  // ---------- Tipo di pagina (serie TV o film) dalla query string ----------
+  const params = new URLSearchParams(window.location.search);
+  const type = params.get('type') === 'movie' ? 'movie' : 'tv';
+  document.title = (type === 'movie' ? 'Film del momento' : 'Serie TV del momento') + ' — Videoteca';
+  document.getElementById('pageTitle').textContent = type === 'movie' ? 'Film del momento' : 'Serie TV del momento';
+
+  // ---------- Collezione (serve per sapere cosa è già nello scaffale) ----------
+  let shows = [];
+  async function loadShows(){
+    try{
+      const data = await apiFetch('/shows');
+      shows = Array.isArray(data) ? data : [];
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      shows = [];
+    }
+  }
+  function saveShows(){
+    apiFetch('/shows', { method:'PUT', body: JSON.stringify(shows) })
+      .catch(e => {
+        if(e.status === 401){ redirectToLogin(); return; }
+        showNotice('Non sono riuscito a salvare i dati sul server.');
+      });
+  }
+
+  // Un titolo "del momento" è già nello scaffale se c'è uno show con lo stesso tmdbId e lo stesso tipo.
+  function isInShelf(item){
+    const wantedType = item.mediaType === 'movie' ? 'film' : 'serie';
+    return shows.some(s => s.tmdbId === item.tmdbId && s.type === wantedType);
+  }
+
+  function applyAddButtonState(btn, added){
+    btn.textContent = added ? '✓' : '+';
+  }
+
+  function buildTrendingCard(item){
+    const card = document.createElement('div');
+    card.className = 'trending-card';
+    card.style.cursor = 'pointer';
+    card.innerHTML = `
+      <div class="trending-poster">
+        ${item.posterUrl ? `<img src="${item.posterUrl}" alt="" loading="lazy">` : '🎬'}
+        <button type="button" class="trending-add" data-action="add" title="Aggiungi allo scaffale">+</button>
+      </div>
+      ${item.rating ? `<span class="trending-rating">★ ${item.rating}</span>` : ''}
+      <div class="trending-title">${escapeHtml(item.title)}${item.year ? ` <span class="trending-year">(${escapeHtml(item.year)})</span>` : ''}</div>
+    `;
+    card.onclick = () => { window.location.href = 'details.html?type=' + item.mediaType + '&id=' + item.tmdbId; };
+    const addBtn = card.querySelector('.trending-add');
+    applyAddButtonState(addBtn, isInShelf(item));
+    addBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleTrendingAdd(item, addBtn);
+    };
+    return card;
+  }
+
+  async function toggleTrendingAdd(item, addBtn){
+    if(addBtn.dataset.busy === '1') return;
+
+    // Se il titolo è già nello scaffale, un secondo clic sullo stesso tasto lo rimuove.
+    if(isInShelf(item)){
+      const wantedType = item.mediaType === 'movie' ? 'film' : 'serie';
+      const existing = shows.find(s => s.tmdbId === item.tmdbId && s.type === wantedType);
+      if(existing){
+        shows = shows.filter(s => s.id !== existing.id);
+        saveShows();
+        applyAddButtonState(addBtn, false);
+        showNotice(`"${existing.title}" rimosso dallo scaffale.`);
+      }
+      return;
+    }
+
+    addBtn.dataset.busy = '1';
+    addBtn.textContent = '…';
+
+    let details;
+    try{
+      details = await apiFetch('/catalog/details?id=' + item.tmdbId + '&type=' + item.mediaType);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      showNotice('Impossibile recuperare i dettagli: ' + e.message);
+      addBtn.dataset.busy = '';
+      addBtn.textContent = '+';
+      return;
+    }
+
+    shows.unshift({
+      id: uid(),
+      title: details.title,
+      type: details.type,
+      rating: 0,
+      favorite: false,
+      episodeRuntime: details.episodeRuntime || null,
+      posterUrl: details.posterUrl || item.posterUrl || null,
+      backdropUrl: details.backdropUrl || null,
+      tmdbId: item.tmdbId || null,
+      lastModifiedAt: Date.now(),
+      seasons: details.seasons
+    });
+    saveShows();
+    addBtn.dataset.busy = '';
+    applyAddButtonState(addBtn, true);
+
+    showNotice('"' + details.title + '" aggiunto alla videoteca.');
+  }
+
+  // ---------- Init ----------
+  const grid = document.getElementById('trendingPageGrid');
+  const expandBtn = document.getElementById('expandBtn');
+  let currentBatch = 1;
+
+  async function loadBatch(batch){
+    return apiFetch('/catalog/trending?type=' + type + '&page=' + batch);
+  }
+
+  expandBtn.onclick = async () => {
+    expandBtn.disabled = true;
+    expandBtn.textContent = 'Caricamento…';
+    currentBatch += 1;
+
+    let results;
+    try{
+      results = await loadBatch(currentBatch);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      showNotice('Impossibile caricare altri titoli: ' + e.message);
+      currentBatch -= 1;
+      expandBtn.disabled = false;
+      expandBtn.textContent = 'Mostra altri 100';
+      return;
+    }
+
+    (results || []).forEach(item => grid.appendChild(buildTrendingCard(item)));
+
+    expandBtn.disabled = false;
+    expandBtn.textContent = 'Mostra altri 100';
+    // Se TMDB ha restituito meno di 100 titoli, non ce ne sono altri da mostrare.
+    if(!results || results.length < 100) expandBtn.style.display = 'none';
+  };
+
+  async function init(){
+    grid.innerHTML = '<div class="trending-page-empty">Caricamento…</div>';
+
+    await loadShows();
+
+    let results;
+    try{
+      results = await loadBatch(currentBatch);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      grid.innerHTML = '<div class="trending-page-empty">' + escapeHtml(e.message || 'Errore durante il caricamento.') + '</div>';
+      return;
+    }
+
+    if(!results || results.length === 0){
+      grid.innerHTML = '<div class="trending-page-empty">Nessun titolo disponibile al momento.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    results.forEach(item => grid.appendChild(buildTrendingCard(item)));
+
+    if(results.length >= 100) expandBtn.style.display = '';
+  }
+  init();
+})();
+</script>
+</body>
+</html>

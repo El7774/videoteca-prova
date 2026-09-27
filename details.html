@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dettagli — Videoteca</title>
+<script>
+  // Guardia di accesso: senza un token salvato si torna al login
+  if (!localStorage.getItem('videoteca-token') && !sessionStorage.getItem('videoteca-token')) {
+    window.location.replace('index.html');
+  }
+  // Applica il tema scelto dall'utente (letto localmente per evitare lo sfarfallio iniziale)
+  (function(){
+    var theme = localStorage.getItem('videoteca-theme');
+    if(theme) document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<link rel="stylesheet" href="styles.css?v=6">
+<style>
+  .details-page-header{ display:flex; align-items:center; gap: 14px; margin-bottom: 20px; }
+
+  .details-layout{ display:flex; gap: 28px; align-items:flex-start; margin-bottom: 40px; flex-wrap: wrap; }
+
+  .details-preview-card{
+    flex: 0 0 280px;
+    width: 280px;
+    aspect-ratio: 2 / 3;
+    border-radius: calc(var(--radius) + 4px);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background-color: var(--panel-raised);
+    background-size: cover;
+    background-position: center;
+  }
+
+  .details-info{ flex: 1 1 320px; min-width: 280px; padding-top: 4px; }
+  .details-info h1{ font-family:'Bebas Neue',sans-serif; font-size: 38px; letter-spacing: 0.5px; color: var(--text); margin: 0 0 12px; line-height: 1.05; }
+  .details-meta-row{ display:flex; align-items:center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .details-genres{ display:flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .details-genre-chip{ font-family:'JetBrains Mono',monospace; font-size: 11px; color: var(--muted); background: var(--panel-raised); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+  .details-overview{ color: var(--muted); font-family:'Inter',sans-serif; font-size: 14px; line-height: 1.6; max-width: 640px; margin-bottom: 18px; }
+  .details-add-btn{ font-family:'JetBrains Mono',monospace; font-size: 13px; font-weight: 700; padding: 9px 20px; border-radius: 999px; border: none; cursor:pointer; background: var(--orange); color: #FCEFE6; }
+  .details-add-btn.added{ background: var(--teal); }
+
+  .details-section{ margin-bottom: 40px; }
+  .details-section h2{ font-family:'Inter',sans-serif; font-weight:700; font-size: 18px; color: var(--text); margin: 0 0 16px; }
+  .details-episode-card{ flex: 1 1 260px; max-width: 340px; display:flex; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+  .details-episode-still{ flex: 0 0 100px; width: 100px; height: 68px; border-radius: 6px; overflow:hidden; background: var(--panel-raised); }
+  .details-episode-still img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .details-episode-info{ min-width:0; }
+  .details-episode-label{ font-family:'JetBrains Mono',monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .details-episode-title{ font-family:'Inter',sans-serif; font-weight:600; font-size: 14px; color: var(--text); }
+  .details-empty{ color: var(--muted); font-family:'JetBrains Mono',monospace; font-size: 13px; }
+
+  .season-filter-row{ display:flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 20px; scrollbar-width: thin; scrollbar-color: var(--orange-dim) transparent; }
+  .season-filter-row::-webkit-scrollbar{ height: 6px; }
+  .season-filter-row::-webkit-scrollbar-track{ background: transparent; }
+  .season-filter-row::-webkit-scrollbar-thumb{ background: var(--orange-dim); border-radius: 999px; }
+  .season-filter-card{
+    flex: 0 0 auto;
+    min-width: 64px;
+    padding: 14px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-weight: 700;
+    font-size: 15px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .season-filter-card:hover{ border-color: var(--orange-dim); color: var(--orange); }
+  .season-filter-card.active{ background: var(--orange); border-color: var(--orange); color: #FCEFE6; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+  .details-episodes-list{ display:flex; flex-direction:column; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="session-bar">
+    <div class="session-identity">
+      <label class="avatar-upload" id="avatarUpload" title="Cambia foto profilo">
+        <img class="avatar-img" id="avatarImg" alt="">
+        <span class="avatar-initial" id="avatarInitial"></span>
+        <input type="file" accept="image/*" id="avatarInput" hidden>
+      </label>
+      <a href="profilo.html" class="profile-link"><strong id="sessionUserName"></strong></a>
+    </div>
+    <button class="btn ghost" id="btnLogout">Esci</button>
+  </div>
+
+  <div class="details-page-header">
+    <a href="homepage.html" class="back-arrow" title="Torna alla videoteca" aria-label="Torna alla videoteca">←</a>
+  </div>
+
+  <div class="details-layout">
+    <div class="details-preview-card" id="detailsPreviewCard"></div>
+    <div class="details-info" id="detailsInfo"></div>
+  </div>
+
+  <div class="details-section" id="seasonsSection" style="display:none;">
+    <h2>Stagioni</h2>
+    <div class="season-filter-row" id="seasonFilterRow"></div>
+    <div class="details-episodes-list" id="seasonEpisodesList"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const TOKEN_KEY = 'videoteca-token';
+  const USERNAME_KEY = 'videoteca-username';
+
+  // ATTENZIONE: sostituisci questo indirizzo con l'URL del tuo server
+  // dopo averlo pubblicato su Render (stesso indirizzo usato negli altri file).
+  const API_BASE = 'https://videoteca-backend.onrender.com/api';
+
+  function getToken(){
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  }
+  function getStoredUsername(){
+    return localStorage.getItem(USERNAME_KEY) || sessionStorage.getItem(USERNAME_KEY);
+  }
+  function redirectToLogin(){
+    localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USERNAME_KEY); sessionStorage.removeItem(USERNAME_KEY);
+    window.location.replace('index.html');
+  }
+
+  async function apiFetch(path, options = {}){
+    const token = getToken();
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if(token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+    let data = null;
+    try{ data = await res.json(); }catch(e){ /* risposta vuota */ }
+    if(!res.ok){
+      const err = new Error((data && data.error) || ('Errore del server (' + res.status + ').'));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  function uid(){
+    return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  }
+  function showNotice(message){
+    const t = document.createElement('div');
+    t.className = 'notice-toast';
+    t.textContent = message;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  // ---------- Sessione / Logout / Avatar (stessa logica delle altre pagine) ----------
+  const authUser = getStoredUsername();
+  const sessionUserName = document.getElementById('sessionUserName');
+  if (sessionUserName) sessionUserName.textContent = authUser || '';
+  document.getElementById('btnLogout').onclick = () => redirectToLogin();
+
+  const avatarImg = document.getElementById('avatarImg');
+  const avatarInitial = document.getElementById('avatarInitial');
+  const avatarInput = document.getElementById('avatarInput');
+
+  function displayAvatar(dataUrl, usernameForInitial){
+    if(dataUrl){
+      avatarImg.src = dataUrl;
+      avatarImg.style.display = 'block';
+      avatarInitial.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+      avatarInitial.style.display = 'flex';
+      avatarInitial.textContent = (usernameForInitial || '?').trim().charAt(0).toUpperCase();
+    }
+  }
+
+  async function loadAccountInfo(){
+    try{
+      const me = await apiFetch('/me');
+      if(me && me.username && sessionUserName) sessionUserName.textContent = me.username;
+      displayAvatar(me ? me.avatar : null, me ? me.username : authUser);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      displayAvatar(null, authUser);
+    }
+  }
+  loadAccountInfo();
+
+  if(avatarInput) avatarInput.onchange = () => {
+    const file = avatarInput.files && avatarInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 160;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        apiFetch('/me/avatar', { method:'PUT', body: JSON.stringify({ avatar: dataUrl }) })
+          .then(() => displayAvatar(dataUrl, authUser))
+          .catch(err => showNotice('Non sono riuscito a salvare la foto: ' + err.message));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    avatarInput.value = '';
+  };
+
+  // ---------- Titolo dalla query string ----------
+  const params = new URLSearchParams(window.location.search);
+  const tmdbId = params.get('id');
+  const mediaType = params.get('type') === 'movie' ? 'movie' : 'tv';
+  const previewCard = document.getElementById('detailsPreviewCard');
+  const infoEl = document.getElementById('detailsInfo');
+
+  if(!tmdbId){
+    infoEl.innerHTML = '<div class="details-empty">Titolo non valido. Torna alla videoteca e riprova.</div>';
+    return;
+  }
+
+  // ---------- Collezione (per sapere se è già nello scaffale e a che punto siamo con gli episodi) ----------
+  let shows = [];
+  async function loadShows(){
+    try{
+      const data = await apiFetch('/shows');
+      shows = Array.isArray(data) ? data : [];
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      shows = [];
+    }
+  }
+  function saveShows(){
+    apiFetch('/shows', { method:'PUT', body: JSON.stringify(shows) })
+      .catch(e => {
+        if(e.status === 401){ redirectToLogin(); return; }
+        showNotice('Non sono riuscito a salvare i dati sul server.');
+      });
+  }
+
+  const wantedType = mediaType === 'movie' ? 'film' : 'serie';
+  function findInShelf(){
+    return shows.find(s => s.tmdbId === Number(tmdbId) && s.type === wantedType) || null;
+  }
+
+  // Ultimo episodio visto e primo non visto, sulla base del progresso salvato in videoteca.
+  function getPrevNextEpisode(show){
+    let prev = null, next = null;
+    for(let si = 0; si < show.seasons.length; si++){
+      const se = show.seasons[si];
+      for(let ei = 0; ei < se.watched.length; ei++){
+        if(se.watched[ei]){
+          prev = { season: si + 1, episode: ei + 1 };
+        } else if(!next){
+          next = { season: si + 1, episode: ei + 1 };
+        }
+      }
+    }
+    return { prev, next };
+  }
+
+  // ---------- Filtro per stagione + elenco completo degli episodi ----------
+  const seasonEpisodesCache = new Map(); // stagione -> Promise<lista episodi grezza>
+
+  function getSeasonEpisodeList(season){
+    if(seasonEpisodesCache.has(season)) return seasonEpisodesCache.get(season);
+    const promise = apiFetch('/catalog/episodes?tvId=' + encodeURIComponent(tmdbId) + '&season=' + season)
+      .catch(() => {
+        seasonEpisodesCache.delete(season); // fallita: riprova al prossimo tentativo
+        return null;
+      });
+    seasonEpisodesCache.set(season, promise);
+    return promise;
+  }
+
+  async function renderSeasonEpisodeList(season){
+    const listEl = document.getElementById('seasonEpisodesList');
+    listEl.innerHTML = '<div class="details-empty">Caricamento…</div>';
+
+    const list = await getSeasonEpisodeList(season);
+    if(!list || list.length === 0){
+      listEl.innerHTML = '<div class="details-empty">Nessun episodio trovato per questa stagione.</div>';
+      return;
+    }
+
+    listEl.innerHTML = '';
+    list
+      .sort((a, b) => a.episodeNumber - b.episodeNumber)
+      .forEach(ep => {
+        listEl.appendChild(buildEpisodeCard('', { season, episode: ep.episodeNumber }, ep));
+      });
+  }
+
+  function renderSeasonFilter(defaultSeason){
+    const section = document.getElementById('seasonsSection');
+    const filterRow = document.getElementById('seasonFilterRow');
+    const totalSeasons = detailsCache.numberOfSeasons;
+    if(!totalSeasons) return;
+
+    section.style.display = 'block';
+    filterRow.innerHTML = '';
+
+    for(let s = 1; s <= totalSeasons; s++){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'season-filter-card' + (s === defaultSeason ? ' active' : '');
+      btn.textContent = 'S' + s;
+      btn.onclick = () => {
+        filterRow.querySelectorAll('.season-filter-card').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderSeasonEpisodeList(s);
+      };
+      filterRow.appendChild(btn);
+    }
+
+    renderSeasonEpisodeList(defaultSeason);
+  }
+
+  function buildEpisodeCard(label, epInfo, epData){
+    const card = document.createElement('div');
+    card.className = 'details-episode-card';
+    const name = (epData && epData.name) ? epData.name : ('Episodio ' + epInfo.episode);
+    const stillUrl = epData && epData.stillUrl;
+    card.innerHTML = `
+      <div class="details-episode-still">${stillUrl ? `<img src="${stillUrl}" alt="" loading="lazy">` : ''}</div>
+      <div class="details-episode-info">
+        <div class="details-episode-label">${label ? label + ' · ' : ''}S${epInfo.season} · E${epInfo.episode}</div>
+        <div class="details-episode-title">${escapeHtml(name)}</div>
+      </div>
+    `;
+    return card;
+  }
+
+  // ---------- Aggiungi / rimuovi dallo scaffale ----------
+  function renderAddButton(details){
+    const existing = findInShelf();
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'details-add-btn' + (existing ? ' added' : '');
+    btn.textContent = existing ? '✓ Nella videoteca' : '+ Aggiungi allo scaffale';
+    btn.onclick = async () => {
+      const current = findInShelf();
+      if(current){
+        shows = shows.filter(s => s.id !== current.id);
+        saveShows();
+        btn.className = 'details-add-btn';
+        btn.textContent = '+ Aggiungi allo scaffale';
+        showNotice(`"${current.title}" rimosso dallo scaffale.`);
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Attendere…';
+      let addDetails;
+      try{
+        addDetails = await apiFetch('/catalog/details?id=' + tmdbId + '&type=' + mediaType);
+      }catch(e){
+        if(e.status === 401){ redirectToLogin(); return; }
+        showNotice('Impossibile recuperare i dettagli: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '+ Aggiungi allo scaffale';
+        return;
+      }
+      shows.unshift({
+        id: uid(),
+        title: addDetails.title,
+        type: addDetails.type,
+        rating: 0,
+        favorite: false,
+        episodeRuntime: addDetails.episodeRuntime || null,
+        posterUrl: addDetails.posterUrl || details.posterUrl || null,
+        backdropUrl: addDetails.backdropUrl || null,
+        tmdbId: Number(tmdbId),
+        lastModifiedAt: Date.now(),
+        seasons: addDetails.seasons
+      });
+      saveShows();
+      btn.disabled = false;
+      btn.className = 'details-add-btn added';
+      btn.textContent = '✓ Nella videoteca';
+      showNotice('"' + addDetails.title + '" aggiunto alla videoteca.');
+    };
+    return btn;
+  }
+
+  // ---------- Init ----------
+  let detailsCache = null;
+
+  async function init(){
+    infoEl.innerHTML = '<div class="details-empty">Caricamento…</div>';
+
+    await loadShows();
+
+    let details;
+    try{
+      details = await apiFetch('/catalog/full-details?id=' + tmdbId + '&type=' + mediaType);
+    }catch(e){
+      if(e.status === 401){ redirectToLogin(); return; }
+      infoEl.innerHTML = '<div class="details-empty">' + escapeHtml(e.message || 'Errore durante il caricamento.') + '</div>';
+      return;
+    }
+    detailsCache = details;
+
+    document.title = details.title + ' — Videoteca';
+
+    const previewImage = details.posterUrl || details.backdropUrl;
+    if(previewImage) previewCard.style.backgroundImage = `url("${previewImage}")`;
+
+    const runtimeLabel = mediaType === 'movie'
+      ? (details.runtime ? `${details.runtime} min` : null)
+      : (details.episodeRuntime ? `${details.episodeRuntime} min/ep` : null);
+
+    infoEl.innerHTML = `
+      <h1>${escapeHtml(details.title)}</h1>
+      <div class="details-meta-row">
+        ${details.year ? `<span class="runtime-badge">${escapeHtml(details.year)}</span>` : ''}
+        ${runtimeLabel ? `<span class="runtime-badge">⏱ ${escapeHtml(runtimeLabel)}</span>` : ''}
+        ${mediaType === 'tv' && details.status ? `<span class="status-badge">${escapeHtml(details.status)}</span>` : ''}
+        ${mediaType === 'tv' && details.numberOfSeasons ? `<span class="status-badge">${details.numberOfSeasons} ${details.numberOfSeasons === 1 ? 'stagione' : 'stagioni'}</span>` : ''}
+        ${details.rating ? `<span class="status-badge">★ ${details.rating} TMDB${details.voteCount ? ' (' + details.voteCount + ' voti)' : ''}</span>` : ''}
+      </div>
+      ${details.genres && details.genres.length ? `<div class="details-genres">${details.genres.map(g => `<span class="details-genre-chip">${escapeHtml(g)}</span>`).join('')}</div>` : ''}
+      ${details.overview ? `<p class="details-overview">${escapeHtml(details.overview)}</p>` : ''}
+    `;
+    infoEl.appendChild(renderAddButton(details));
+
+    if(mediaType === 'tv'){
+      const existing = findInShelf();
+      let defaultSeason = 1;
+      if(existing){
+        const { prev, next } = getPrevNextEpisode(existing);
+        defaultSeason = (next || prev || { season: 1 }).season;
+      }
+      renderSeasonFilter(defaultSeason);
+    }
+  }
+  init();
+})();
+</script>
+</body>
+</html>
