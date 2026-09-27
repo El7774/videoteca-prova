@@ -113,7 +113,6 @@
     <div class="trending-carousel" id="trendingMoviesCarousel"></div>
   </div>
 
-
 </div>
 
 <div class="overlay" id="confirmOverlay" style="display:none;">
@@ -127,39 +126,9 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script>
 (function(){
-  // ATTENZIONE: sostituisci questo indirizzo con l'URL del tuo server
-  // dopo averlo pubblicato su Render (vedi la guida ricevuta in chat).
-  const API_BASE = 'https://videoteca-backend.onrender.com/api';
-
-  function getToken(){
-    return localStorage.getItem('videoteca-token') || sessionStorage.getItem('videoteca-token');
-  }
-  function getStoredUsername(){
-    return localStorage.getItem('videoteca-username') || sessionStorage.getItem('videoteca-username');
-  }
-  function redirectToLogin(){
-    localStorage.removeItem('videoteca-token'); sessionStorage.removeItem('videoteca-token');
-    localStorage.removeItem('videoteca-username'); sessionStorage.removeItem('videoteca-username');
-    window.location.replace('index.html');
-  }
-
-  async function apiFetch(path, options = {}){
-    const token = getToken();
-    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
-    if(token) headers['Authorization'] = 'Bearer ' + token;
-    const res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
-    let data = null;
-    try{ data = await res.json(); }catch(e){ /* risposta vuota */ }
-    if(!res.ok){
-      const err = new Error((data && data.error) || ('Errore del server (' + res.status + ').'));
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }
-
   let shows = [];
   let mediaFilter = 'all';
   const seasonEpisodeNamesCache = new Map(); // 'tvId:season' -> Promise<{[episodeNumber]: {name, stillUrl, runtime}}>
@@ -611,14 +580,6 @@
     });
   }
 
-  function showNotice(message){
-    const t = document.createElement('div');
-    t.className = 'notice-toast';
-    t.textContent = message;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 3200);
-  }
-
   // Popup di conferma personalizzato (al posto del confirm() nativo del browser).
   // Uso: if(!(await showConfirm('Messaggio?'))) return;
   const confirmOverlay = document.getElementById('confirmOverlay');
@@ -670,8 +631,6 @@
         showNotice('Non sono riuscito a salvare i dati sul server.');
       });
   }
-
-  function uid(){ return 'id_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
 
   function touchShow(show){
     show.lastModifiedAt = Date.now();
@@ -726,7 +685,6 @@
     if(media === 'all') return list;
     return list.filter(s => s.type === media);
   }
-
 
   function buildFavoriteCard(show){
     const hue = hashHue(show.title);
@@ -938,12 +896,6 @@
     countEl.textContent = favorites.length;
     carousel.innerHTML = '';
     favorites.forEach(show => carousel.appendChild(buildFavoriteCard(show)));
-  }
-
-  function escapeHtml(str){
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
   }
 
   function render(){

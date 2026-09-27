@@ -39,22 +39,41 @@ app.set('trust proxy', 1);
 
 // CORS: per sicurezza, accettiamo richieste solo dai siti indicati in
 // ALLOWED_ORIGINS (es. il tuo indirizzo GitHub Pages), separati da virgola.
-// In locale, senza questa variabile impostata, accetta tutto (comodo per testare).
+// In locale/development, se la variabile e' vuota, accettiamo tutto per comodita'.
+// In produzione (NODE_ENV=production) la variabile e' obbligatoria: se manca,
+// il CORS e' fail-closed (nessuna origine cross-site e' ammessa) e sul log
+// compare un avviso esplicito cosi' sai di dover configurare ALLOWED_ORIGINS su Render.
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction && allowedOrigins.length === 0) {
+  console.warn(
+    '[CORS] ALLOWED_ORIGINS non configurata in produzione: le richieste cross-origin verranno bloccate. ' +
+    'Imposta ALLOWED_ORIGINS su Render (es. https://tuo-utente.github.io).'
+  );
+}
+
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Richiesta CORS rifiutata. Origine ricevuta:', JSON.stringify(origin), '| Origini consentite:', allowedOrigins);
+    // Richieste senza header Origin (curl, Postman, navigazione diretta) sempre ammesse.
+    if (!origin) return callback(null, true);
+    // In locale/development con ALLOWED_ORIGINS vuota, apriamo a tutto per comodita'.
+    // In produzione con ALLOWED_ORIGINS vuota, blocchiamo le origini cross-site (fail-closed).
+    if (allowedOrigins.length === 0) {
+      if (!isProduction) return callback(null, true);
+      console.log('Richiesta CORS rifiutata (produzione senza ALLOWED_ORIGINS). Origine:', JSON.stringify(origin));
       const err = new Error('Origine non consentita da CORS: ' + origin);
       err.status = 403;
-      callback(err);
+      return callback(err);
     }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.log('Richiesta CORS rifiutata. Origine ricevuta:', JSON.stringify(origin), '| Origini consentite:', allowedOrigins);
+    const err = new Error('Origine non consentita da CORS: ' + origin);
+    err.status = 403;
+    callback(err);
   }
 }));
 

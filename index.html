@@ -272,14 +272,9 @@
     </div>
   </div>
 
-  <script>
+  <script src="config.js"></script>
+<script>
     (function () {
-      const TOKEN_KEY = 'videoteca-token';
-      const USERNAME_KEY = 'videoteca-username';
-
-      // ATTENZIONE: sostituisci questo indirizzo con l'URL del tuo server
-      // dopo averlo pubblicato su Render (vedi la guida ricevuta in chat).
-      const API_BASE = 'https://videoteca-backend.onrender.com/api';
 
       // Se l'utente ha già un token salvato, salta direttamente alla homepage
       if (localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)) {
@@ -287,29 +282,7 @@
         return;
       }
 
-      async function apiRequest(path, body) {
-        const res = await fetch(API_BASE + path, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-        let data = null;
-        try { data = await res.json(); } catch (e) { /* risposta vuota */ }
-        if (!res.ok) {
-          throw new Error((data && data.error) || 'Impossibile contattare il server.');
-        }
-        return data;
-      }
 
-      function setAuth(token, username, remember) {
-        if (remember) {
-          localStorage.setItem(TOKEN_KEY, token);
-          localStorage.setItem(USERNAME_KEY, username);
-        } else {
-          sessionStorage.setItem(TOKEN_KEY, token);
-          sessionStorage.setItem(USERNAME_KEY, username);
-        }
-      }
 
       function showError(el, message) {
         el.textContent = message;

@@ -23,19 +23,133 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          display: ['Bebas Neue', 'sans-serif'],
-          sans: ['Inter', 'sans-serif']
-        }
-      }
-    }
-  };
-</script>
+<!-- Fix 7: Tailwind Play CDN (cdn.tailwindcss.com) rimosso: era pensato solo per prototipi,
+     generava CSS a runtime, mancava di versioning e aveva CSP peggiore. Le utility usate qui
+     sono ora in CSS locale. -->
+<style>
+/* Utility sostitutive per Tailwind Play CDN — generate */
+[class~="flex"] { display:flex; }
+[class~="grid"] { display:grid; }
+[class~="hidden"] { display:none; }
+[class~="inline-flex"] { display:inline-flex; }
+[class~="sticky"] { position:sticky; }
+[class~="fixed"] { position:fixed; }
+[class~="absolute"] { position:absolute; }
+[class~="relative"] { position:relative; }
+[class~="inset-0"] { inset:0; }
+[class~="top-0"] { top:0; }
+[class~="top-1/2"] { top:50%; }
+[class~="top-3"] { top:0.75rem; }
+[class~="top-4"] { top:1rem; }
+[class~="right-3"] { right:0.75rem; }
+[class~="right-4"] { right:1rem; }
+[class~="-left-4"] { left:-1rem; }
+[class~="-right-4"] { right:-1rem; }
+[class~="-translate-y-1/2"] { transform:translateY(-50%); }
+[class~="z-40"] { z-index:40; }
+[class~="z-50"] { z-index:50; }
+[class~="shrink-0"] { flex-shrink:0; }
+[class~="flex-1"] { flex:1 1 0%; }
+[class~="flex-col"] { flex-direction:column; }
+[class~="items-center"] { align-items:center; }
+[class~="justify-between"] { justify-content:space-between; }
+[class~="justify-center"] { justify-content:center; }
+[class~="gap-2"] { gap:0.5rem; }
+[class~="gap-3"] { gap:0.75rem; }
+[class~="gap-4"] { gap:1rem; }
+[class~="overflow-hidden"] { overflow:hidden; }
+[class~="truncate"] { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+[class~="line-clamp-2"] { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+[class~="cursor-pointer"] { cursor:pointer; }
+[class~="transition"] { transition:all 0.15s ease; }
+[class~="grid-cols-2"] { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+@media (min-width:640px) { [class~="sm:grid-cols-3"] { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+@media (min-width:1024px) { [class~="lg:grid-cols-6"] { grid-template-columns:repeat(6, minmax(0, 1fr)); } }
+[class~="hidden"] { display:none; }
+@media (min-width:640px) { [class~="sm:flex"] { display:flex; } }
+@media (min-width:640px) { [class~="sm:hidden"] { display:none; } }
+[class~="w-8"] { width:2rem; }
+[class~="w-10"] { width:2.5rem; }
+[class~="w-full"] { width:100%; }
+[class~="h-8"] { height:2rem; }
+[class~="h-10"] { height:2.5rem; }
+[class~="h-16"] { height:4rem; }
+[class~="h-24"] { height:6rem; }
+[class~="h-40"] { height:10rem; }
+[class~="h-full"] { height:100%; }
+[class~="min-h-screen"] { min-height:100vh; }
+[class~="max-w-md"] { max-width:28rem; }
+[class~="max-w-xl"] { max-width:36rem; }
+[class~="max-w-6xl"] { max-width:72rem; }
+[class~="mx-auto"] { margin-left:auto; margin-right:auto; }
+[class~="p-4"] { padding:1rem; }
+[class~="p-5"] { padding:1.25rem; }
+[class~="p-6"] { padding:1.5rem; }
+[class~="px-2.5"] { padding-left:0.625rem; padding-right:0.625rem; }
+[class~="px-3"] { padding-left:0.75rem; padding-right:0.75rem; }
+[class~="px-5"] { padding-left:1.25rem; padding-right:1.25rem; }
+[class~="py-1"] { padding-top:0.25rem; padding-bottom:0.25rem; }
+[class~="py-2"] { padding-top:0.5rem; padding-bottom:0.5rem; }
+[class~="py-2.5"] { padding-top:0.625rem; padding-bottom:0.625rem; }
+[class~="py-8"] { padding-top:2rem; padding-bottom:2rem; }
+[class~="py-14"] { padding-top:3.5rem; padding-bottom:3.5rem; }
+[class~="pt-20"] { padding-top:5rem; }
+[class~="pb-16"] { padding-bottom:4rem; }
+[class~="pb-8"] { padding-bottom:2rem; }
+@media (min-width:640px) { [class~="sm:px-8"] { padding-left:2rem; padding-right:2rem; } }
+[class~="px-5"] { padding-left:1.25rem; padding-right:1.25rem; }
+[class~="mt-6"] { margin-top:1.5rem; }
+[class~="mt-8"] { margin-top:2rem; }
+[class~="mt-9"] { margin-top:2.25rem; }
+[class~="mt-10"] { margin-top:2.5rem; }
+[class~="mb-1"] { margin-bottom:0.25rem; }
+[class~="mb-2"] { margin-bottom:0.5rem; }
+[class~="mb-3"] { margin-bottom:0.75rem; }
+[class~="mb-5"] { margin-bottom:1.25rem; }
+[class~="mb-8"] { margin-bottom:2rem; }
+[class~="rounded-2xl"] { border-radius:1rem; }
+[class~="rounded-full"] { border-radius:9999px; }
+[class~="rounded-md"] { border-radius:0.375rem; }
+[class~="rounded-xl"] { border-radius:0.75rem; }
+[class~="border-t"] { border-top-width:1px; border-style:solid; }
+[class~="border-[var(--line)]"] { border-color:var(--line); border-width:1px; border-style:solid; }
+[class~="hover:border-[var(--orange)]"]:hover { border-color:var(--orange); }
+[class~="hover:border-[var(--teal)]"]:hover { border-color:var(--teal); }
+[class~="text-center"] { text-align:center; }
+[class~="text-left"] { text-align:left; }
+[class~="font-display"] { font-family:'Bebas Neue', sans-serif; }
+[class~="font-mono"] { font-family:'JetBrains Mono', monospace; }
+[class~="font-normal"] { font-weight:400; }
+[class~="font-semibold"] { font-weight:600; }
+[class~="tracking-wide"] { letter-spacing:0.025em; }
+[class~="tracking-[3px]"] { letter-spacing:3px; }
+[class~="leading-snug"] { line-height:1.375; }
+[class~="leading-relaxed"] { line-height:1.625; }
+[class~="text-[10px]"] { font-size:10px; }
+[class~="text-[11px]"] { font-size:11px; }
+[class~="text-xs"] { font-size:0.75rem; line-height:1rem; }
+[class~="text-sm"] { font-size:0.875rem; line-height:1.25rem; }
+[class~="text-base"] { font-size:1rem; line-height:1.5rem; }
+[class~="text-lg"] { font-size:1.125rem; line-height:1.75rem; }
+[class~="text-xl"] { font-size:1.25rem; line-height:1.75rem; }
+[class~="text-2xl"] { font-size:1.5rem; line-height:2rem; }
+[class~="text-3xl"] { font-size:1.875rem; line-height:2.25rem; }
+[class~="text-4xl"] { font-size:2.25rem; line-height:2.5rem; }
+[class~="text-5xl"] { font-size:3rem; line-height:1; }
+@media (min-width:640px) { [class~="sm:text-lg"] { font-size:1.125rem; line-height:1.75rem; } }
+@media (min-width:640px) { [class~="sm:text-4xl"] { font-size:2.25rem; line-height:2.5rem; } }
+@media (min-width:640px) { [class~="sm:text-7xl"] { font-size:4.5rem; line-height:1; } }
+@media (min-width:1024px) { [class~="lg:text-8xl"] { font-size:6rem; line-height:1; } }
+[class~="text-[var(--text)]"] { color:var(--text); }
+[class~="text-[var(--muted)]"] { color:var(--muted); }
+[class~="text-[var(--orange)]"] { color:var(--orange); }
+[class~="text-[var(--teal)]"] { color:var(--teal); }
+@media (min-width:640px) { [class~="sm:text-lg"] { font-size:1.125rem; } }
+[class~="w-10"] { width:2.5rem; }
+[class~="h-10"] { height:2.5rem; }
+[class~="text-[11px]"] { font-size:11px; }
+
+</style>
 
 <style>
   html, body { background: var(--bg); font-family: 'Inter', sans-serif; }
@@ -266,7 +380,8 @@
     </div>
   </div>
 
-  <script>
+  <script src="config.js"></script>
+<script>
   (function () {
     // =========================================================
     // DATI DI ESEMPIO — sostituibili in futuro con dati reali
@@ -439,19 +554,7 @@
     // Saluto e stato di accesso — questa pagina è già "protetta"
     // dalla guardia in testa al file, quindi qui l'utente è sempre loggato.
     // =========================================================
-    const TOKEN_KEY = 'videoteca-token';
-    const USERNAME_KEY = 'videoteca-username';
 
-    // ATTENZIONE: sostituisci questo indirizzo con l'URL del tuo server
-    // dopo averlo pubblicato su Render (stessa riga già vista negli altri file).
-    const API_BASE = 'https://videoteca-backend.onrender.com/api';
-
-    function getToken(){
-      return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
-    }
-    function getStoredUsername(){
-      return localStorage.getItem(USERNAME_KEY) || sessionStorage.getItem(USERNAME_KEY);
-    }
 
     const username = getStoredUsername();
     const greetingEl = document.getElementById('greeting');
